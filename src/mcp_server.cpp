@@ -754,14 +754,15 @@ json server::handle_initialize(const request& req, const std::string& session_id
     std::string requested_version = params["protocolVersion"].get<std::string>();
     LOG_INFO("Client requested protocol version: ", requested_version);
 
-    if (requested_version != MCP_VERSION) {
-        LOG_ERROR("Unsupported protocol version: ", requested_version, ", server supports: ", MCP_VERSION);
+    bool version_supported = (requested_version == "2024-11-05" || requested_version == "2025-11-25");
+    if (!version_supported) {
+        LOG_ERROR("Unsupported protocol version: ", requested_version, ", server supports: 2024-11-05, 2025-11-25");
         return response::create_error(
             req.id, 
             error_code::invalid_params, 
             "Unsupported protocol version",
             {
-                {"supported", {MCP_VERSION}},
+                {"supported", {"2024-11-05", "2025-11-25"}},
                 {"requested", params["protocolVersion"]}
             }
         ).to_json();
@@ -790,7 +791,7 @@ json server::handle_initialize(const request& req, const std::string& session_id
     };
 
     json result = {
-        {"protocolVersion", MCP_VERSION},
+        {"protocolVersion", requested_version},
         {"capabilities", capabilities_},
         {"serverInfo", server_info}
     };
@@ -877,8 +878,8 @@ void server::set_session_initialized(const std::string& session_id, bool initial
 }
 
 std::string server::generate_session_id() const {
-    std::random_device rd;
-    std::mt19937 gen(rd());
+    thread_local std::random_device rd;
+    thread_local std::mt19937 gen(rd());
     std::uniform_int_distribution<> dis(0, 15);
     
     std::stringstream ss;
@@ -979,9 +980,11 @@ void server::close_session(const std::string& session_id) {
             dispatcher_to_close->close();
         }
         
-        // Release thread resources
+        // Release thread resources safely
         if (thread_to_release) {
-            thread_to_release.release();
+            if (thread_to_release->joinable()) {
+                thread_to_release->detach();
+            }
         }
     } catch (const std::exception& e) {
         LOG_WARNING("Exception while cleaning up session resources: ", session_id, ", ", e.what());

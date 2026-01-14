@@ -15,6 +15,7 @@
 #include <functional>
 #include <memory>
 #include <stdexcept>
+#include <atomic>
 
 // Include the JSON library for parsing and generating JSON
 #include "json.hpp"
@@ -25,7 +26,7 @@ namespace mcp {
 using json = nlohmann::ordered_json;
 
 // MCP version
-constexpr const char* MCP_VERSION = "2024-11-05";
+constexpr const char* MCP_VERSION = "2025-11-25";
 
 // MCP error codes (JSON-RPC 2.0 standard codes)
 enum class error_code {
@@ -122,8 +123,8 @@ struct request {
 private:
     // Generate a unique ID
     static json generate_id() {
-        static int next_id = 1;
-        return next_id++;
+        static std::atomic<int> next_id{1};
+        return next_id.fetch_add(1, std::memory_order_relaxed);
     }
 };
 
