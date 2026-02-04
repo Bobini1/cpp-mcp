@@ -1,8 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
 
-# Set test project
-set(TEST_PROJECT_NAME "mcp_tests")
-project(${TEST_PROJECT_NAME})
+project(mcp_tests)
 
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 17)
@@ -12,17 +10,14 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(Threads REQUIRED)
 
 # Use local Google Test
-set(GTEST_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/googletest)
-add_subdirectory(${GTEST_ROOT} googletest-build)
-
-# For older versions of CMake, this option needs to be set
+FetchContent_Declare(
+    googletest
+    GIT_REPOSITORY https://github.com/google/googletest.git
+    GIT_TAG v1.17.0
+    FIND_PACKAGE_ARGS NAMES GTest
+)
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-
-# Include header directories
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../include)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../common)
-include_directories(${GTEST_ROOT}/googletest/include)
-include_directories(${GTEST_ROOT}/googlemock/include)
+FetchContent_MakeAvailable(googletest)
 
 # Add test source files
 set(TEST_SOURCES
@@ -30,47 +25,14 @@ set(TEST_SOURCES
 )
 
 # Create test executable
-add_executable(${TEST_PROJECT_NAME} ${TEST_SOURCES})
-
-# Link directories
-link_directories(${CMAKE_CURRENT_SOURCE_DIR}/../build/src)
-
-if(WIN32)
-    set(MCP_LIB_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../build/src/mcp.lib")
-else()
-    set(MCP_LIB_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../build/src/libmcp.a")
-endif()
+add_executable(mcp_tests mcp_test.cpp)
 
 # Link Google Test and MCP library
-target_link_libraries(${TEST_PROJECT_NAME} PRIVATE
-    gtest
-    gtest_main
-    gmock
-    gmock_main
+target_link_libraries(mcp_tests PRIVATE
+    GTest::gtest_main
+    GTest::gmock_main
     mcp
-    Threads::Threads
 )
 
-# If OpenSSL is found, link OpenSSL libraries
-if(OPENSSL_FOUND)
-    target_link_libraries(${TEST_PROJECT_NAME} PRIVATE ${OPENSSL_LIBRARIES})
-endif()
-
-if(APPLE)
-    set_target_properties(${TEST_PROJECT_NAME} PROPERTIES LINK_FLAGS "-Wl,-no_warn_duplicate_libraries")
-endif()
-
-# Enable testing
-enable_testing()
-
-# Add test
-add_test(
-    NAME ${TEST_PROJECT_NAME}
-    COMMAND ${TEST_PROJECT_NAME}
-)
-
-# Add custom target to run tests
-add_custom_target(run_tests
-    COMMAND ${CMAKE_CTEST_COMMAND} --verbose
-    DEPENDS ${TEST_PROJECT_NAME}
-) 
+include(GoogleTest)
+gtest_discover_tests(mcp_tests)
