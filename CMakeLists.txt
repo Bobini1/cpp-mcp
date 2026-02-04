@@ -13,6 +13,7 @@ endif()
 
 find_package(httplib REQUIRED)
 find_package(nlohmann_json REQUIRED)
+find_package(base64 REQUIRED)
 find_package(Threads REQUIRED)
 
 add_library(mcp STATIC
@@ -24,7 +25,7 @@ add_library(mcp STATIC
         src/mcp_sse_client.cpp
 )
 
-target_link_libraries(mcp PUBLIC Threads::Threads httplib::httplib nlohmann_json::nlohmann_json base64)
+target_link_libraries(mcp PUBLIC Threads::Threads httplib::httplib nlohmann_json::nlohmann_json base64::base64)
 
 target_include_directories(mcp PUBLIC
         "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
