@@ -9,6 +9,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Find required packages
 find_package(Threads REQUIRED)
 
+include(FetchContent)
 # Use local Google Test
 FetchContent_Declare(
     googletest
