@@ -69,8 +69,10 @@ endif()
 
 target_compile_features(mcp PUBLIC cxx_std_17)
 
-# Add examples
-add_subdirectory(examples)
+option(MCP_BUILD_EXAMPLES "Build the examples" OFF)
+if (MCP_BUILD_EXAMPLES)
+    add_subdirectory(examples)
+endif()
 
 # Add test directory
 option(MCP_BUILD_TESTS "Build the tests" OFF)
