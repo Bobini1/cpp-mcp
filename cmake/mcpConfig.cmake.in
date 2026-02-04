@@ -1,0 +1,17 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}")
+
+find_dependency(Threads REQUIRED)
+find_dependency(httplib REQUIRED)
+find_dependency(nlohmann_json REQUIRED)
+find_dependency(base64 REQUIRED)
+if(@MCP_SSL@)
+    find_dependency(OpenSSL 3.0.0 COMPONENTS Crypto SSL REQUIRED)
+endif()
+
+include("${CMAKE_CURRENT_LIST_DIR}/mcpTargets.cmake")
+
+check_required_components(mcp)

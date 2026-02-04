@@ -1,41 +1,18 @@
 cmake_minimum_required(VERSION 3.10)
 project(MCP VERSION 2024.11.05 LANGUAGES CXX)
 
-option(BUILD_SHARED_LIBS "build shared libraries" ${BUILD_SHARED_LIBS_DEFAULT})
-
 if (WIN32)
     add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
 endif()
 
 option(MCP_SSL "Enable SSL support" OFF)
-
 if(MCP_SSL)
     find_package(OpenSSL 3.0.0 COMPONENTS Crypto SSL REQUIRED)
     add_compile_definitions(MCP_SSL CPPHTTPLIB_OPENSSL_SUPPORT)
 endif()
 
-include(FetchContent)
-FetchContent_Declare(
-        cpphttplib
-        GIT_REPOSITORY https://github.com/yhirose/cpp-httplib
-        GIT_TAG v0.30.2
-        FIND_PACKAGE_ARGS NAMES httplib
-)
-FetchContent_MakeAvailable(cpphttplib)
-FetchContent_Declare(
-        nlohmann_json
-        GIT_REPOSITORY https://github.com/nlohmann/json
-        GIT_TAG v3.12.0
-        FIND_PACKAGE_ARGS
-)
-FetchContent_MakeAvailable(nlohmann_json)
-FetchContent_Declare(
-        base64
-        GIT_REPOSITORY https://github.com/Bobini1/base64
-        GIT_TAG master
-        FIND_PACKAGE_ARGS
-)
-FetchContent_MakeAvailable(base64)
+find_package(httplib REQUIRED)
+find_package(nlohmann_json REQUIRED)
 find_package(Threads REQUIRED)
 
 add_library(mcp STATIC
@@ -52,9 +29,6 @@ target_link_libraries(mcp PUBLIC Threads::Threads httplib::httplib nlohmann_json
 target_include_directories(mcp PUBLIC
         "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
         "$<INSTALL_INTERFACE:include/cpp-mcp>"
-)
-target_include_directories(mcp PUBLIC
-        "${CMAKE_CURRENT_SOURCE_DIR}/common"
 )
 
 # If OpenSSL is found, link the OpenSSL libraries
@@ -80,3 +54,37 @@ if(MCP_BUILD_TESTS)
     enable_testing()
     add_subdirectory(test)
 endif()
+
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+
+install(TARGETS mcp
+        EXPORT mcpTargets
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
+install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/cpp-mcp)
+install(EXPORT mcpTargets
+        FILE mcpTargets.cmake
+        NAMESPACE mcp::
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/mcp
+)
+
+configure_package_config_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/cmake/mcpConfig.cmake.in"
+        "${CMAKE_CURRENT_BINARY_DIR}/mcpConfig.cmake"
+        INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/mcp
+)
+
+write_basic_package_version_file(
+        "${CMAKE_CURRENT_BINARY_DIR}/mcpConfigVersion.cmake"
+        VERSION ${PROJECT_VERSION}
+        COMPATIBILITY SameMajorVersion
+)
+
+install(FILES
+        "${CMAKE_CURRENT_BINARY_DIR}/mcpConfig.cmake"
+        "${CMAKE_CURRENT_BINARY_DIR}/mcpConfigVersion.cmake"
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/mcp
+)
