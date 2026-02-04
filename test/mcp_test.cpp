@@ -97,7 +97,7 @@ class LifecycleEnvironment : public ::testing::Environment {
 public:
     void SetUp() override {
         // Set up test environment
-        server_ = std::make_unique<server>("localhost", 8080);
+        server_ = std::make_unique<server>(server::configuration{"localhost", 8080});
         server_->set_server_info("TestServer", "1.0.0");
         
         // Set server capabilities
@@ -117,7 +117,7 @@ public:
             {"roots", {{"listChanged", true}}},
             {"sampling", json::object()}
         };
-        client_ = std::make_unique<sse_client>("localhost", 8080);
+        client_ = std::make_unique<sse_client>("localhost:8080");
         client_->set_capabilities(client_capabilities);
     }
 
@@ -153,7 +153,7 @@ protected:
     }
 
     // Use raw pointer instead of reference
-    sse_client* client_;
+    sse_client* client_ = nullptr;
 };
 
 // Test initialize process
@@ -178,7 +178,7 @@ class VersioningEnvironment : public ::testing::Environment {
 public:
     void SetUp() override {
         // Set up test environment
-        server_ = std::make_unique<server>("localhost", 8081);
+        server_ = std::make_unique<server>(server::configuration{"localhost", 8081});
         server_->set_server_info("TestServer", "1.0.0");
         
         // Set server capabilities
@@ -193,7 +193,7 @@ public:
         // Start server (non-blocking mode)
         server_->start(false);
 
-        client_ = std::make_unique<sse_client>("localhost", 8081);
+        client_ = std::make_unique<sse_client>("localhost:8081");
     }
 
     void TearDown() override {
@@ -347,7 +347,7 @@ class PingEnvironment : public ::testing::Environment {
 public:
     void SetUp() override {
         // Set up test environment
-        server_ = std::make_unique<server>("localhost", 8082);
+        server_ = std::make_unique<server>(server::configuration{"localhost", 8082});
         
         // Start server (non-blocking mode)
         server_->start(false);
@@ -357,7 +357,7 @@ public:
             {"roots", {{"listChanged", true}}},
             {"sampling", json::object()}
         };
-        client_ = std::make_unique<sse_client>("localhost", 8082);
+        client_ = std::make_unique<sse_client>("localhost:8082");
         client_->set_capabilities(client_capabilities);
     }
 
@@ -509,7 +509,7 @@ class ToolsEnvironment : public ::testing::Environment {
 public:
     void SetUp() override {
         // Set up test environment
-        server_ = std::make_unique<server>("localhost", 8083);
+        server_ = std::make_unique<server>(server::configuration{"localhost", 8083});
         
         // Create a test tool
         tool test_tool;
@@ -590,7 +590,7 @@ public:
             {"roots", {{"listChanged", true}}},
             {"sampling", json::object()}
         };
-        client_ = std::make_unique<sse_client>("localhost", 8083);
+        client_ = std::make_unique<sse_client>("localhost:8083");
         client_->set_capabilities(client_capabilities);
         client_->initialize("TestClient", "1.0.0");
     }
