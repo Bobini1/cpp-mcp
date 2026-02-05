@@ -16,6 +16,7 @@
 #include <memory>
 #include <functional>
 #include <map>
+#include <atomic>
 
 namespace mcp {
 
@@ -301,7 +302,7 @@ private:
     
     std::map<std::string, std::shared_ptr<resource>> resources_;
     std::map<int, std::pair<std::string, std::function<void(const std::string&)>>> subscriptions_;
-    int next_subscription_id_ = 1;
+    std::atomic<int> next_subscription_id_{1};
 };
 
 } // namespace mcp
