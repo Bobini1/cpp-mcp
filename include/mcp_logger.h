@@ -79,10 +79,9 @@ private:
         // Add timestamp
         auto now = std::chrono::system_clock::now();
         auto now_c = std::chrono::system_clock::to_time_t(now);
-        std::tm now_tm{};
-        localtime_r(&now_c, &now_tm);
+        auto now_tm = std::localtime(&now_c);
         
-        ss << std::put_time(&now_tm, "%Y-%m-%d %H:%M:%S") << " ";
+        ss << std::put_time(now_tm, "%Y-%m-%d %H:%M:%S") << " ";
         
         // Add log level and color
         switch (level) {
