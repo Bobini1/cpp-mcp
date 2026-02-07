@@ -1,0 +1,12 @@
+{
+  "name": "cpp-mcp",
+  "version-date": "2026-02-04",
+  "description": "Lightweight C++ MCP (Model Context Protocol) SDK",
+  "homepage": "https://github.com/Bobini1/cpp-mcp",
+  "license": "MIT",
+  "dependencies": [
+    "nlohmann-json",
+    "terrakuh-base64",
+    "cpp-httplib"
+  ]
+}
