@@ -50,12 +50,6 @@ public:
     virtual json read() const = 0;
     
     /**
-     * @brief Check if the resource has been modified
-     * @return True if the resource has been modified since last read
-     */
-    virtual bool is_modified() const = 0;
-    
-    /**
      * @brief Get the URI of the resource
      * @return The URI as string
      */
@@ -96,12 +90,6 @@ public:
     json read() const override;
     
     /**
-     * @brief Check if the resource has been modified
-     * @return True if the resource has been modified since last read
-     */
-    bool is_modified() const override;
-    
-    /**
      * @brief Set the text content of the resource
      * @param text The text content
      */
@@ -118,7 +106,6 @@ protected:
     std::string mime_type_;
     std::string description_;
     std::string text_;
-    mutable bool modified_;
 };
 
 /**
@@ -155,12 +142,6 @@ public:
     json read() const override;
     
     /**
-     * @brief Check if the resource has been modified
-     * @return True if the resource has been modified since last read
-     */
-    bool is_modified() const override;
-    
-    /**
      * @brief Set the binary content of the resource
      * @param data Pointer to the binary data
      * @param size Size of the binary data
@@ -178,7 +159,6 @@ protected:
     std::string mime_type_;
     std::string description_;
     std::vector<uint8_t> data_;
-    mutable bool modified_;
 };
 
 /**
@@ -204,12 +184,6 @@ public:
      * @return The resource content as JSON
      */
     json read() const override;
-    
-    /**
-     * @brief Check if the resource has been modified
-     * @return True if the resource has been modified since last read
-     */
-    bool is_modified() const override;
 
 private:
     std::string file_path_;

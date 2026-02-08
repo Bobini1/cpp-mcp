@@ -33,7 +33,7 @@ text_resource::text_resource(const std::string& uri,
                            const std::string& name, 
                            const std::string& mime_type,
                            const std::string& description)
-    : resource(uri), name_(name), mime_type_(mime_type), description_(description), modified_(false) {
+    : resource(uri), name_(name), mime_type_(mime_type), description_(description) {
 }
 
 json text_resource::get_metadata() const {
@@ -46,7 +46,6 @@ json text_resource::get_metadata() const {
 }
 
 json text_resource::read() const {
-    modified_ = false;
     return {
         {"uri", get_uri()},
         {"mimeType", mime_type_},
@@ -54,14 +53,9 @@ json text_resource::read() const {
     };
 }
 
-bool text_resource::is_modified() const {
-    return modified_;
-}
-
 void text_resource::set_text(const std::string& text) {
     if (text_ != text) {
         text_ = text;
-        modified_ = true;
     }
 }
 
@@ -74,7 +68,7 @@ binary_resource::binary_resource(const std::string& uri,
                                const std::string& name, 
                                const std::string& mime_type,
                                const std::string& description)
-    : resource(uri), name_(name), mime_type_(mime_type), description_(description), modified_(false) {
+    : resource(uri), name_(name), mime_type_(mime_type), description_(description) {
 }
 
 json binary_resource::get_metadata() const {
@@ -87,8 +81,6 @@ json binary_resource::get_metadata() const {
 }
 
 json binary_resource::read() const {
-    modified_ = false;
-    
     // Base64 encode the binary data
     std::string base64_data;
     if (!data_.empty()) {
@@ -102,16 +94,11 @@ json binary_resource::read() const {
     };
 }
 
-bool binary_resource::is_modified() const {
-    return modified_;
-}
-
 void binary_resource::set_data(const uint8_t* data, size_t size) {
     data_.resize(size);
     if (size > 0) {
         std::memcpy(data_.data(), data, size);
     }
-    modified_ = true;
 }
 
 const std::vector<uint8_t>& binary_resource::get_data() const {
@@ -153,23 +140,11 @@ json file_resource::read() const {
     // Update last modified time
     last_modified_ = fs::last_write_time(file_path_).time_since_epoch().count();
     
-    // Mark as not modified after read
-    modified_ = false;
-    
     return {
         {"uri", get_uri()},
         {"mimeType", mime_type_},
         {"text", text_}
     };
-}
-
-bool file_resource::is_modified() const {
-    if (!fs::exists(file_path_)) {
-        return true; // File was deleted
-    }
-    
-    time_t current_modified = fs::last_write_time(file_path_).time_since_epoch().count();
-    return current_modified != last_modified_;
 }
 
 std::string file_resource::guess_mime_type(const std::string& file_path) {
