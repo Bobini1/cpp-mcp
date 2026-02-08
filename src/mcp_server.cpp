@@ -284,9 +284,9 @@ void server::register_notification(const std::string& method, notification_handl
     notification_handlers_[method] = handler;
 }
 
-void server::register_resource(const std::string& path, std::shared_ptr<resource> resource) {
+void server::register_resource(std::shared_ptr<resource> resource) {
     std::lock_guard<std::mutex> lock(mutex_);
-    resources_[path] = resource;
+    resources_[resource->get_uri()] = resource;
     
     // Register methods for resource access
     if (method_handlers_.find("resources/read") == method_handlers_.end()) {

@@ -28,7 +28,13 @@ namespace mcp {
  * accessed through the MCP protocol. Each resource is identified by a URI.
  */
 class resource {
+    std::string uri_;
 public:
+    /**
+     * @brief Constructor
+     * @param uri The URI of the resource
+     */
+    explicit resource(const std::string& uri);
     virtual ~resource() = default;
     
     /**
@@ -53,7 +59,7 @@ public:
      * @brief Get the URI of the resource
      * @return The URI as string
      */
-    virtual std::string get_uri() const = 0;
+    const std::string& get_uri() const;
 };
 
 /**
@@ -96,12 +102,6 @@ public:
     bool is_modified() const override;
     
     /**
-     * @brief Get the URI of the resource
-     * @return The URI as string
-     */
-    std::string get_uri() const override;
-    
-    /**
      * @brief Set the text content of the resource
      * @param text The text content
      */
@@ -114,7 +114,6 @@ public:
     std::string get_text() const;
 
 protected:
-    std::string uri_;
     std::string name_;
     std::string mime_type_;
     std::string description_;
@@ -162,12 +161,6 @@ public:
     bool is_modified() const override;
     
     /**
-     * @brief Get the URI of the resource
-     * @return The URI as string
-     */
-    std::string get_uri() const override;
-    
-    /**
      * @brief Set the binary content of the resource
      * @param data Pointer to the binary data
      * @param size Size of the binary data
@@ -181,7 +174,6 @@ public:
     const std::vector<uint8_t>& get_data() const;
 
 protected:
-    std::string uri_;
     std::string name_;
     std::string mime_type_;
     std::string description_;

@@ -278,10 +278,9 @@ public:
     
     /**
      * @brief Register a resource
-     * @param path The path to mount the resource at
      * @param resource The resource to register
      */
-    void register_resource(const std::string& path, std::shared_ptr<resource> resource);
+    void register_resource(std::shared_ptr<resource> resource);
     
     /**
      * @brief Register a tool

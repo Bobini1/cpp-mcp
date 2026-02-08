@@ -18,18 +18,27 @@
 namespace fs = std::filesystem;
 
 namespace mcp {
+resource::resource(const std::string& uri)
+    : uri_(uri)
+{
+}
+
+const std::string& resource::get_uri() const
+{
+    return uri_;
+}
 
 // text_resource implementation
 text_resource::text_resource(const std::string& uri, 
                            const std::string& name, 
                            const std::string& mime_type,
                            const std::string& description)
-    : uri_(uri), name_(name), mime_type_(mime_type), description_(description), modified_(false) {
+    : resource(uri), name_(name), mime_type_(mime_type), description_(description), modified_(false) {
 }
 
 json text_resource::get_metadata() const {
     return {
-        {"uri", uri_},
+        {"uri", get_uri()},
         {"name", name_},
         {"mimeType", mime_type_},
         {"description", description_}
@@ -39,7 +48,7 @@ json text_resource::get_metadata() const {
 json text_resource::read() const {
     modified_ = false;
     return {
-        {"uri", uri_},
+        {"uri", get_uri()},
         {"mimeType", mime_type_},
         {"text", text_}
     };
@@ -47,10 +56,6 @@ json text_resource::read() const {
 
 bool text_resource::is_modified() const {
     return modified_;
-}
-
-std::string text_resource::get_uri() const {
-    return uri_;
 }
 
 void text_resource::set_text(const std::string& text) {
@@ -69,12 +74,12 @@ binary_resource::binary_resource(const std::string& uri,
                                const std::string& name, 
                                const std::string& mime_type,
                                const std::string& description)
-    : uri_(uri), name_(name), mime_type_(mime_type), description_(description), modified_(false) {
+    : resource(uri), name_(name), mime_type_(mime_type), description_(description), modified_(false) {
 }
 
 json binary_resource::get_metadata() const {
     return {
-        {"uri", uri_},
+        {"uri", get_uri()},
         {"name", name_},
         {"mimeType", mime_type_},
         {"description", description_}
@@ -91,7 +96,7 @@ json binary_resource::read() const {
     }
     
     return {
-        {"uri", uri_},
+        {"uri", get_uri()},
         {"mimeType", mime_type_},
         {"blob", base64_data}
     };
@@ -99,10 +104,6 @@ json binary_resource::read() const {
 
 bool binary_resource::is_modified() const {
     return modified_;
-}
-
-std::string binary_resource::get_uri() const {
-    return uri_;
 }
 
 void binary_resource::set_data(const uint8_t* data, size_t size) {
@@ -156,7 +157,7 @@ json file_resource::read() const {
     modified_ = false;
     
     return {
-        {"uri", uri_},
+        {"uri", get_uri()},
         {"mimeType", mime_type_},
         {"text", text_}
     };

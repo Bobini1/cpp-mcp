@@ -172,7 +172,7 @@ int main() {
     
     // // Register resources
     // auto file_resource = std::make_shared<mcp::file_resource>("./Makefile");
-    // server.register_resource("file://./Makefile", file_resource);
+    // server.register_resource("file_resource);
     
     // Start server
     std::cout << "Starting MCP server at " << srv_conf.host << ":" << srv_conf.port << std::endl;
