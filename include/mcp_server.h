@@ -334,12 +334,12 @@ private:
     
     // The HTTP server
     std::unique_ptr<httplib::Server> http_server_;
-    
+
     // Server thread (for non-blocking mode)
-    std::unique_ptr<std::thread> server_thread_;
+    std::jthread server_thread_;
 
     // SSE thread
-    std::map<std::string, std::unique_ptr<std::thread>> sse_threads_;
+    std::unordered_map<std::string, std::jthread> sse_threads_;
 
     // Event dispatcher for server-sent events
     event_dispatcher sse_dispatcher_;
@@ -380,28 +380,28 @@ private:
 
     // Handle SSE requests
     void handle_sse(const httplib::Request& req, httplib::Response& res);
-    
+
     // Handle incoming JSON-RPC requests
     void handle_jsonrpc(const httplib::Request& req, httplib::Response& res);
 
     // Send a JSON-RPC message to a client
     void send_jsonrpc(const std::string& session_id, const json& message);
-    
+
     // Process a JSON-RPC request
     json process_request(const request& req, const std::string& session_id);
-    
+
     // Handle initialization request
     json handle_initialize(const request& req, const std::string& session_id);
-    
+
     // Check if a session is initialized
     bool is_session_initialized(const std::string& session_id) const;
-    
+
     // Set session initialization status
     void set_session_initialized(const std::string& session_id, bool initialized);
 
     // Generate a random session ID
     std::string generate_session_id() const;
-    
+
     // Auxiliary function to create an async handler from a regular handler
     template<typename F>
     std::function<std::future<json>(const json&, const std::string&)> make_async_handler(F&& handler) {
@@ -419,7 +419,7 @@ private:
     private:
         std::lock_guard<std::mutex> lock_;
     };
-    
+
     // Get auto lock
     auto_lock get_lock() const {
         return auto_lock(mutex_);
@@ -428,10 +428,7 @@ private:
     // Session management and maintenance
     void check_inactive_sessions();
 
-    std::mutex maintenance_mutex_;
-    std::condition_variable maintenance_cond_;
-    std::unique_ptr<std::thread> maintenance_thread_;
-    bool maintenance_thread_run_ = false;
+    std::jthread maintenance_thread_;
 
     // Session cleanup handler
     std::map<std::string, session_cleanup_handler> session_cleanup_handler_;

@@ -43,7 +43,7 @@ if (MSVC)
     target_compile_options(mcp PUBLIC "$<$<COMPILE_LANGUAGE:C,CXX>:/bigobj>")
 endif ()
 
-target_compile_features(mcp PUBLIC cxx_std_17)
+target_compile_features(mcp PUBLIC cxx_std_20)
 
 option(MCP_BUILD_EXAMPLES "Build the examples" OFF)
 if (MCP_BUILD_EXAMPLES)
