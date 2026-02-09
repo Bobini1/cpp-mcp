@@ -370,8 +370,8 @@ private:
     mutable std::mutex mutex_;
     
     // Running flag
-    bool running_ = false;
-    
+    std::atomic<bool> running_{false};
+
     // Thread pool for async method handlers
     thread_pool thread_pool_;
     

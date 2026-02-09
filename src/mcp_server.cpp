@@ -49,7 +49,7 @@ server::~server() {
 
 
 bool server::start(bool blocking) {
-    if (running_) {
+    if (running_.load()) {
         return true;  // Already running
     }
 
@@ -89,7 +89,7 @@ bool server::start(bool blocking) {
                     lock,
                     std::chrono::minutes(1),
                     [this, &st]() {
-                        return st.stop_requested() || !running_;
+                        return st.stop_requested() || !running_.load();
                     }
                 );
 
@@ -113,10 +113,16 @@ bool server::start(bool blocking) {
 
     // Start server
     if (blocking) {
-        running_ = true;
+        {
+            std::lock_guard<std::mutex> lk(maintenance_mutex_);
+            running_.store(true);
+        }
         SPDLOG_INFO("Starting server in blocking mode");
         if (!http_server_->listen(host_.c_str(), port_)) {
-            running_ = false;
+            {
+                std::lock_guard<std::mutex> lk(maintenance_mutex_);
+                running_.store(false);
+            }
             SPDLOG_ERROR("Failed to start server on ", host_, ":", port_);
             return false;
         }
@@ -127,21 +133,28 @@ bool server::start(bool blocking) {
             SPDLOG_INFO("Starting server in separate thread");
             if (!http_server_->listen(host_.c_str(), port_)) {
                 SPDLOG_ERROR("Failed to start server on ", host_, ":", port_);
-                running_ = false;
+                std::lock_guard<std::mutex> lk(maintenance_mutex_);
+                running_.store(false);
             }
         });
-        running_ = true;
+        {
+            std::lock_guard<std::mutex> lk(maintenance_mutex_);
+            running_.store(true);
+        }
         return true;
     }
 }
 
 void server::stop() {
-    if (!running_) {
+    if (!running_.load()) {
         return;
     }
 
     SPDLOG_INFO("Stopping MCP server on ", host_, ":", port_);
-    running_ = false;
+    {
+        std::lock_guard<std::mutex> lk(maintenance_mutex_);
+        running_.store(false);
+    }
     http_server_->stop();
     maintenance_cv_.notify_all();
 
@@ -187,7 +200,7 @@ void server::stop() {
 }
 
 bool server::is_running() const {
-    return running_;
+    return running_.load();
 }
 
 void server::set_server_info(const std::string& name, const std::string& version) {
@@ -387,7 +400,7 @@ void server::handle_sse(const httplib::Request& req, httplib::Response& res) {
             std::mutex wait_mutex;
             std::condition_variable wait_cv;
             auto interrupted = [this, &st, session_dispatcher]() {
-                return st.stop_requested() || !running_ || session_dispatcher->is_closed();
+                return st.stop_requested() || !running_.load() || session_dispatcher->is_closed();
             };
             std::stop_callback stop_cb(st, [&wait_cv]() {
                 wait_cv.notify_all();
@@ -404,7 +417,7 @@ void server::handle_sse(const httplib::Request& req, httplib::Response& res) {
             session_dispatcher->send_event("event: endpoint\r\ndata: " + session_uri + "\r\n\r\n");
             session_dispatcher->update_activity();
             int heartbeat_count = 0;
-            while (running_ && !st.stop_requested() && !session_dispatcher->is_closed()) {
+            while (running_.load() && !st.stop_requested() && !session_dispatcher->is_closed()) {
                 if (wait_with_interrupt(std::chrono::seconds(5))) {
                     break;
                 }
@@ -836,7 +849,7 @@ std::string server::generate_session_id() const {
 }
 
 void server::check_inactive_sessions() {
-    if (!running_) return;
+    if (!running_.load()) return;
 
     const auto now = std::chrono::steady_clock::now();
     const auto timeout = std::chrono::minutes(60); // 1 hour inactive then close
