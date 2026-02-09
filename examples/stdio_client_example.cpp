@@ -7,16 +7,16 @@
  */
 
 #include "mcp_stdio_client.h"
-#include "mcp_logger.h"
 
 #include <iostream>
 #include <string>
 #include <thread>
 #include <chrono>
+#include <spdlog/spdlog.h>
 
 int main(int argc, char** argv) {
     // Set log level to info
-    mcp::set_log_level(mcp::log_level::info);
+    spdlog::set_level(spdlog::level::info);
     
     // Check command line arguments
     if (argc < 2) {

@@ -7,6 +7,9 @@
  */
 
 #include "mcp_sse_client.h"
+
+#include <spdlog/spdlog.h>
+
 #include "base64.hpp"
 
 namespace mcp {
@@ -44,7 +47,7 @@ void sse_client::init_client(const std::string& scheme_host_port, bool validate_
 }
 
 bool sse_client::initialize(const std::string& client_name, const std::string& client_version) {
-    LOG_INFO("Initializing MCP client...");
+    SPDLOG_INFO("Initializing MCP client...");
     
     request req = request::create("initialize", {
         {"protocolVersion", MCP_VERSION},
@@ -56,7 +59,7 @@ bool sse_client::initialize(const std::string& client_name, const std::string& c
     });
     
     try {
-        LOG_INFO("Opening SSE connection...");
+        SPDLOG_INFO("Opening SSE connection...");
         open_sse_connection();
         
         const auto timeout = std::chrono::milliseconds(5000);
@@ -66,18 +69,18 @@ bool sse_client::initialize(const std::string& client_name, const std::string& c
             
             bool success = endpoint_cv_.wait_for(lock, timeout, [this]() {
                 if (!sse_running_) {
-                    LOG_WARNING("SSE connection closed, stopping wait");
+                    SPDLOG_WARN("SSE connection closed, stopping wait");
                     return true;
                 }
                 if (!msg_endpoint_.empty()) {
-                    LOG_INFO("Message endpoint set, stopping wait");
+                    SPDLOG_INFO("Message endpoint set, stopping wait");
                     return true;
                 }
                 return false;
             });
             
             if (!success) {
-                LOG_WARNING("Condition variable wait timed out");
+                SPDLOG_WARN("Condition variable wait timed out");
             }
             
             if (!sse_running_) {
@@ -88,7 +91,7 @@ bool sse_client::initialize(const std::string& client_name, const std::string& c
                 throw std::runtime_error("Timeout waiting for SSE connection, failed to get message endpoint");
             }
             
-            LOG_INFO("Successfully got message endpoint: ", msg_endpoint_);
+            SPDLOG_INFO("Successfully got message endpoint: {}",msg_endpoint_);
         }
 
         json result = send_jsonrpc(req);
@@ -100,7 +103,7 @@ bool sse_client::initialize(const std::string& client_name, const std::string& c
         
         return true;
     } catch (const std::exception& e) {
-        LOG_ERROR("Initialization failed: ", e.what());
+        SPDLOG_ERROR("Initialization failed: {}",e.what());
         close_sse_connection();
         return false;
     }
@@ -251,7 +254,7 @@ void sse_client::open_sse_connection() {
     }
     
     std::string connection_info = "Base URL: " + scheme_host_port_ + ", SSE Endpoint: " + sse_endpoint_;    
-    LOG_INFO("Attempting to establish SSE connection: ", connection_info);
+    SPDLOG_INFO("Attempting to establish SSE connection: {}",connection_info);
     
     sse_thread_ = std::make_unique<std::thread>([this]() {
         int retry_count = 0;
@@ -260,7 +263,7 @@ void sse_client::open_sse_connection() {
         
         while (sse_running_) {
             try {
-                LOG_INFO("SSE thread: Attempting to connect to ", sse_endpoint_);
+                SPDLOG_INFO("SSE thread: Attempting to connect to ", sse_endpoint_);
                 
                 std::string buffer;
                 auto res = sse_client_->Get(sse_endpoint_, 
@@ -283,7 +286,7 @@ void sse_client::open_sse_connection() {
                             start_pos = 0;
                             
                             if (!parse_sse_data(event.data(), event.size())) {
-                                LOG_ERROR("SSE thread: Failed to parse event");
+                                SPDLOG_ERROR("SSE thread: Failed to parse event");
                             }
                         }
                         
@@ -297,22 +300,22 @@ void sse_client::open_sse_connection() {
                 }
                 
                 retry_count = 0;
-                LOG_INFO("SSE thread: Connection successful");
+                SPDLOG_INFO("SSE thread: Connection successful");
             } catch (const std::exception& e) {                
                 if (!sse_running_) {
-                    LOG_INFO("SSE connection actively closed, no retry needed");
+                    SPDLOG_INFO("SSE connection actively closed, no retry needed");
                     break;
                 }
                 
                 if (++retry_count > max_retries) {
-                    LOG_ERROR("Maximum retry count reached, stopping SSE connection attempts");
+                    SPDLOG_ERROR("Maximum retry count reached, stopping SSE connection attempts");
                     break;
                 }
 
-                LOG_ERROR("SSE connection error: ", e.what());
+                SPDLOG_ERROR("SSE connection error: {}",e.what());
                 
                 int delay = retry_delay_base * (1 << (retry_count - 1));
-                LOG_INFO("Will retry in ", delay, " ms (attempt ", retry_count, "/", max_retries, ")");
+                SPDLOG_INFO("Will retry in ", delay, " ms (attempt ", retry_count, "/", max_retries, ")");
                 
                 const int check_interval = 100;
                 for (int waited = 0; waited < delay && sse_running_; waited += check_interval) {
@@ -320,13 +323,13 @@ void sse_client::open_sse_connection() {
                 }
                 
                 if (!sse_running_) {
-                    LOG_INFO("SSE connection actively closed during retry wait, stopping retry");
+                    SPDLOG_INFO("SSE connection actively closed during retry wait, stopping retry");
                     break;
                 }
             }
         }
         
-        LOG_INFO("SSE thread: Exiting");
+        SPDLOG_INFO("SSE thread: Exiting");
     });
 }
 
@@ -395,32 +398,32 @@ bool sse_client::parse_sse_data(const char* data, size_t length) {
                         
                         pending_requests_.erase(it);
                     } else {
-                        LOG_WARNING("Received response for unknown request ID: ", id);
+                        SPDLOG_WARN("Received response for unknown request ID: {}", id.dump());
                     }
                 } else {
-                    LOG_WARNING("Received invalid JSON-RPC response: ", response.dump());
+                    SPDLOG_WARN("Received invalid JSON-RPC response: {}",response.dump());
                 }
             } catch (const json::exception& e) {
-                LOG_ERROR("Failed to parse JSON-RPC response: ", e.what());
+                SPDLOG_ERROR("Failed to parse JSON-RPC response: {}",e.what());
             }
             return true;
         } else {
-            LOG_WARNING("Received unknown event type: ", event_type);
+            SPDLOG_WARN("Received unknown event type: {}",event_type);
             return true;
         }
     } catch (const std::exception& e) {
-        LOG_ERROR("Error parsing SSE data: ", e.what());
+        SPDLOG_ERROR("Error parsing SSE data: {}",e.what());
         return false;
     }
 }
 
 void sse_client::close_sse_connection() {
     if (!sse_running_) {
-        LOG_INFO("SSE connection already closed");
+        SPDLOG_INFO("SSE connection already closed");
         return;
     }
     
-    LOG_INFO("Actively closing SSE connection (normal exit flow)...");
+    SPDLOG_INFO("Actively closing SSE connection (normal exit flow)...");
     
     sse_running_ = false;
     
@@ -430,22 +433,22 @@ void sse_client::close_sse_connection() {
         auto timeout = std::chrono::seconds(5);
         auto start = std::chrono::steady_clock::now();
         
-        LOG_INFO("Waiting for SSE thread to end...");
+        SPDLOG_INFO("Waiting for SSE thread to end...");
         
         while (sse_thread_->joinable() && 
             std::chrono::steady_clock::now() - start < timeout) {
             try {
                 sse_thread_->join();
-                LOG_INFO("SSE thread successfully ended");
+                SPDLOG_INFO("SSE thread successfully ended");
                 break;
             } catch (const std::exception& e) {
-                LOG_ERROR("Error waiting for SSE thread: ", e.what());
+                SPDLOG_ERROR("Error waiting for SSE thread: {}",e.what());
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
             }
         }
         
         if (sse_thread_->joinable()) {
-            LOG_WARNING("SSE thread did not end within timeout, detaching thread");
+            SPDLOG_WARN("SSE thread did not end within timeout, detaching thread");
             sse_thread_->detach();
         }
     }
@@ -456,7 +459,7 @@ void sse_client::close_sse_connection() {
         endpoint_cv_.notify_all();
     }
     
-    LOG_INFO("SSE connection successfully closed (normal exit flow)");
+    SPDLOG_INFO("SSE connection successfully closed (normal exit flow)");
 }
 
 json sse_client::send_jsonrpc(const request& req) {
@@ -482,7 +485,7 @@ json sse_client::send_jsonrpc(const request& req) {
         if (!result) {
             auto err = result.error();
             std::string error_msg = httplib::to_string(err);
-            LOG_ERROR("JSON-RPC request failed: ", error_msg);
+            SPDLOG_ERROR("JSON-RPC request failed: {}",error_msg);
             throw mcp_exception(error_code::internal_error, error_msg);
         }
         
@@ -508,7 +511,7 @@ json sse_client::send_jsonrpc(const request& req) {
             pending_requests_.erase(req.id);
         }
         
-        LOG_ERROR("JSON-RPC request failed: ", error_msg);
+        SPDLOG_ERROR("JSON-RPC request failed: {}",error_msg);
         throw mcp_exception(error_code::internal_error, error_msg);
     }
     

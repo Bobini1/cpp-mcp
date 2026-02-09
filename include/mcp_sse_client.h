@@ -12,7 +12,6 @@
 #include "mcp_client.h"
 #include "mcp_message.h"
 #include "mcp_tool.h"
-#include "mcp_logger.h"
 
 // Include the HTTP library
 #include "httplib.h"

@@ -13,7 +13,6 @@
 #include "mcp_resource.h"
 #include "mcp_tool.h"
 #include "mcp_thread_pool.h"
-#include "mcp_logger.h"
 
 // Include the HTTP library
 #include "httplib.h"

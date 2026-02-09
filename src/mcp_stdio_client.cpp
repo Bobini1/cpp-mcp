@@ -9,6 +9,8 @@
 
 #include "mcp_stdio_client.h"
 
+#include <spdlog/spdlog.h>
+
 #if defined(_WIN32)
 #include <windows.h>
 #include <io.h>
@@ -30,7 +32,7 @@ namespace mcp {
 stdio_client::stdio_client(const std::string& command, const json& env_vars, const json& capabilities)
     : command_(command), capabilities_(capabilities), env_vars_(env_vars) {
     
-    LOG_INFO("Creating MCP stdio client for command: ", command);
+    SPDLOG_INFO("Creating MCP stdio client for command: {}", command);
 }
 
 stdio_client::~stdio_client() {
@@ -38,10 +40,10 @@ stdio_client::~stdio_client() {
 }
 
 bool stdio_client::initialize(const std::string& client_name, const std::string& client_version) {
-    LOG_INFO("Initializing MCP stdio client...");
+    SPDLOG_INFO("Initializing MCP stdio client...");
     
     if (!start_server_process()) {
-        LOG_ERROR("Failed to start server process");
+        SPDLOG_ERROR("Failed to start server process");
         return false;
     }
     
@@ -67,7 +69,7 @@ bool stdio_client::initialize(const std::string& client_name, const std::string&
         
         return true;
     } catch (const std::exception& e) {
-        LOG_ERROR("Initialization failed: ", e.what());
+        SPDLOG_ERROR("Initialization failed: {}",e.what());
         stop_server_process();
         return false;
     }
@@ -191,7 +193,7 @@ bool stdio_client::is_running() const {
 
 void stdio_client::set_environment_variables(const json& env_vars) {
     if (running_) {
-        LOG_WARNING("Cannot set environment variables while server is running");
+        SPDLOG_WARN("Cannot set environment variables while server is running");
         return;
     }
     env_vars_ = env_vars;
@@ -199,11 +201,11 @@ void stdio_client::set_environment_variables(const json& env_vars) {
 
 bool stdio_client::start_server_process() {
     if (running_) {
-        LOG_INFO("Server process already running");
+        SPDLOG_INFO("Server process already running");
         return true;
     }
     
-    LOG_INFO("Starting server process: ", command_);
+    SPDLOG_INFO("Starting server process: {}",command_);
 
     auto convert_to_string = [](const json& value) -> std::string {
         if (value.is_string()) {
@@ -232,26 +234,26 @@ bool stdio_client::start_server_process() {
     HANDLE child_stdout_write = NULL;
     
     if (!CreatePipe(&child_stdin_read, &child_stdin_write, &sa, 0)) {
-        LOG_ERROR("Failed to create stdin pipe: ", GetLastError());
+        SPDLOG_ERROR("Failed to create stdin pipe: {}",GetLastError());
         return false;
     }
     
     if (!SetHandleInformation(child_stdin_write, HANDLE_FLAG_INHERIT, 0)) {
-        LOG_ERROR("Failed to set stdin pipe properties: ", GetLastError());
+        SPDLOG_ERROR("Failed to set stdin pipe properties: {}",GetLastError());
         CloseHandle(child_stdin_read);
         CloseHandle(child_stdin_write);
         return false;
     }
     
     if (!CreatePipe(&child_stdout_read, &child_stdout_write, &sa, 0)) {
-        LOG_ERROR("Failed to create stdout pipe: ", GetLastError());
+        SPDLOG_ERROR("Failed to create stdout pipe: {}",GetLastError());
         CloseHandle(child_stdin_read);
         CloseHandle(child_stdin_write);
         return false;
     }
     
     if (!SetHandleInformation(child_stdout_read, HANDLE_FLAG_INHERIT, 0)) {
-        LOG_ERROR("Failed to set stdout pipe properties: ", GetLastError());
+        SPDLOG_ERROR("Failed to set stdout pipe properties: {}",GetLastError());
         CloseHandle(child_stdin_read);
         CloseHandle(child_stdin_write);
         CloseHandle(child_stdout_read);
@@ -301,7 +303,7 @@ bool stdio_client::start_server_process() {
     free(cmd_line_ptr);
     
     if (!success) {
-        LOG_ERROR("Failed to create process: ", GetLastError());
+        SPDLOG_ERROR("Failed to create process: {}",GetLastError());
         CloseHandle(child_stdin_read);
         CloseHandle(child_stdin_write);
         CloseHandle(child_stdout_read);
@@ -331,12 +333,12 @@ bool stdio_client::start_server_process() {
     // POSIX implementation
     // Create pipes
     if (pipe(stdin_pipe_) == -1) {
-        LOG_ERROR("Failed to create stdin pipe: ", strerror(errno));
+        SPDLOG_ERROR("Failed to create stdin pipe: {}",strerror(errno));
         return false;
     }
     
     if (pipe(stdout_pipe_) == -1) {
-        LOG_ERROR("Failed to create stdout pipe: ", strerror(errno));
+        SPDLOG_ERROR("Failed to create stdout pipe: {}",strerror(errno));
         close(stdin_pipe_[0]);
         close(stdin_pipe_[1]);
         return false;
@@ -346,7 +348,7 @@ bool stdio_client::start_server_process() {
     process_id_ = fork();
     
     if (process_id_ == -1) {
-        LOG_ERROR("Failed to fork process: ", strerror(errno));
+        SPDLOG_ERROR("Failed to fork process: {}",strerror(errno));
         close(stdin_pipe_[0]);
         close(stdin_pipe_[1]);
         close(stdout_pipe_[0]);
@@ -362,7 +364,7 @@ bool stdio_client::start_server_process() {
             for (const auto& [key, value] : env_vars_.items()) {
                 std::string env_var = key + "=" + convert_to_string(value);
                 if (putenv(const_cast<char*>(env_var.c_str())) != 0) {
-                    LOG_ERROR("Failed to set environment variable: ", key);
+                    SPDLOG_ERROR("Failed to set environment variable: {}",key);
                 }
             }
         }
@@ -373,12 +375,12 @@ bool stdio_client::start_server_process() {
         
         // Redirect standard input/output
         if (dup2(stdin_pipe_[0], STDIN_FILENO) == -1) {
-            LOG_ERROR("Failed to redirect stdin: ", strerror(errno));
+            SPDLOG_ERROR("Failed to redirect stdin: {}",strerror(errno));
             exit(EXIT_FAILURE);
         }
         
         if (dup2(stdout_pipe_[1], STDOUT_FILENO) == -1) {
-            LOG_ERROR("Failed to redirect stdout: ", strerror(errno));
+            SPDLOG_ERROR("Failed to redirect stdout: {}",strerror(errno));
             exit(EXIT_FAILURE);
         }
         
@@ -408,7 +410,7 @@ bool stdio_client::start_server_process() {
         execvp(c_args[0], c_args.data());
         
         // If execvp returns, it means an error occurred
-        LOG_ERROR("Failed to execute command: ", strerror(errno));
+        SPDLOG_ERROR("Failed to execute command: {}",strerror(errno));
         exit(EXIT_FAILURE);
     }
     
@@ -427,7 +429,7 @@ bool stdio_client::start_server_process() {
     pid_t result = waitpid(process_id_, &status, WNOHANG);
     
     if (result == process_id_) {
-        LOG_ERROR("Server process exited immediately with status: ", WEXITSTATUS(status));
+        SPDLOG_ERROR("Server process exited immediately with status: {}",WEXITSTATUS(status));
         running_ = false;
         
         if (read_thread_ && read_thread_->joinable()) {
@@ -439,7 +441,7 @@ bool stdio_client::start_server_process() {
         
         return false;
     } else if (result == -1) {
-        LOG_ERROR("Failed to check process status: ", strerror(errno));
+        SPDLOG_ERROR("Failed to check process status: {}",strerror(errno));
         running_ = false;
         
         if (read_thread_ && read_thread_->joinable()) {
@@ -465,7 +467,7 @@ bool stdio_client::start_server_process() {
     // Check if process is still running
     DWORD exit_code;
     if (GetExitCodeProcess(process_handle_, &exit_code) && exit_code != STILL_ACTIVE) {
-        LOG_ERROR("Server process exited immediately with status: ", exit_code);
+        SPDLOG_ERROR("Server process exited immediately with status: {}",exit_code);
         running_ = false;
         
         if (read_thread_ && read_thread_->joinable()) {
@@ -480,7 +482,7 @@ bool stdio_client::start_server_process() {
     }
 #endif
     
-    LOG_INFO("Server process started successfully, PID: ", process_id_);
+    SPDLOG_INFO("Server process started successfully, PID: {}",process_id_);
     return true;
 }
 
@@ -489,7 +491,7 @@ void stdio_client::stop_server_process() {
         return;
     }
     
-    LOG_INFO("Stopping server process...");
+    SPDLOG_INFO("Stopping server process...");
     
     running_ = false;
     
@@ -513,7 +515,7 @@ void stdio_client::stop_server_process() {
     
     // Terminate process
     if (process_handle_ != NULL) {
-        LOG_INFO("Terminating process: ", process_id_);
+        SPDLOG_INFO("Terminating process: {}",process_id_);
         TerminateProcess(process_handle_, 0);
         
         // Wait for process to finish
@@ -522,7 +524,7 @@ void stdio_client::stop_server_process() {
         DWORD exit_code;
         if (GetExitCodeProcess(process_handle_, &exit_code) && exit_code == STILL_ACTIVE) {
             // Process is still running, force termination
-            LOG_WARNING("Process did not terminate, forcing termination");
+            SPDLOG_WARN("Process did not terminate, forcing termination");
             TerminateProcess(process_handle_, 1);
             WaitForSingleObject(process_handle_, 1000);
         }
@@ -551,7 +553,7 @@ void stdio_client::stop_server_process() {
     
     // Terminate process
     if (process_id_ > 0) {
-        LOG_INFO("Sending SIGTERM to process: ", process_id_);
+        SPDLOG_INFO("Sending SIGTERM to process: {}",process_id_);
         kill(process_id_, SIGTERM);
         
         // Wait for process to finish
@@ -566,7 +568,7 @@ void stdio_client::stop_server_process() {
             
             if (result == 0) {
                 // Process is still running, force termination
-                LOG_WARNING("Process did not terminate, sending SIGKILL");
+                SPDLOG_WARN("Process did not terminate, sending SIGKILL");
                 kill(process_id_, SIGKILL);
                 waitpid(process_id_, &status, 0);
             }
@@ -576,11 +578,11 @@ void stdio_client::stop_server_process() {
     }
 #endif
     
-    LOG_INFO("Server process stopped");
+    SPDLOG_INFO("Server process stopped");
 }
 
 void stdio_client::read_thread_func() {
-    LOG_INFO("Read thread started");
+    SPDLOG_INFO("Read thread started");
     
     const int buffer_size = 4096;
     char buffer[buffer_size];
@@ -637,16 +639,16 @@ void stdio_client::read_thread_func() {
                                     
                                     pending_requests_.erase(it);
                                 } else {
-                                    LOG_WARNING("Received response for unknown request ID: ", id);
+                                    SPDLOG_WARN("Received response for unknown request ID: {}", id.dump());
                                 }
                             } else if (message.contains("method")) {
                                 // This is a request or notification
-                                LOG_INFO("Received request/notification: ", message["method"]);
+                                SPDLOG_INFO("Received request/notification: {}", message["method"].dump());
                                 // Currently not handling requests from the server
                             }
                         }
                     } catch (const json::exception& e) {
-                        LOG_INFO("message: ", line);
+                        SPDLOG_INFO("message: {}", line);
                     }
                 }
             }
@@ -657,14 +659,14 @@ void stdio_client::read_thread_func() {
                 // The pipe is closed - check if the process is still running
                 DWORD exit_code;
                 if (GetExitCodeProcess(process_handle_, &exit_code) && exit_code != STILL_ACTIVE) {
-                    LOG_WARNING("Service process exited, exit code: ", exit_code);
+                    SPDLOG_WARN("Service process exited, exit code: {}",exit_code);
                     break;
                 }
                 
                 // The pipe is closed but the process is still running - it might be a temporary state
                 retry_count++;
                 if (retry_count > 5) {
-                    LOG_ERROR("The pipe is closed but the process is still running, retry count has reached the limit");
+                    SPDLOG_ERROR("The pipe is closed but the process is still running, retry count has reached the limit");
                     break;
                 }
                 
@@ -676,11 +678,11 @@ void stdio_client::read_thread_func() {
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
             } else if (error != ERROR_IO_PENDING) {
                 // Other errors, log and retry
-                LOG_ERROR("Error reading from pipe: ", error);
+                SPDLOG_ERROR("Error reading from pipe: {}",error);
                 retry_count++;
                 
                 if (retry_count > 10) {
-                    LOG_ERROR("Read error retry count has reached the limit, exiting read loop");
+                    SPDLOG_ERROR("Read error retry count has reached the limit, exiting read loop");
                     break;
                 }
                 
@@ -698,7 +700,7 @@ void stdio_client::read_thread_func() {
         if (retry_count > 3) {
             DWORD exit_code;
             if (GetExitCodeProcess(process_handle_, &exit_code) && exit_code != STILL_ACTIVE) {
-                LOG_WARNING("Service process exited, exit code: ", exit_code);
+                SPDLOG_WARN("Service process exited, exit code: {}",exit_code);
                 break;
             }
         }
@@ -746,36 +748,36 @@ void stdio_client::read_thread_func() {
                                     
                                     pending_requests_.erase(it);
                                 } else {
-                                    LOG_WARNING("Received response for unknown request ID: ", id);
+                                    SPDLOG_WARN("Received response for unknown request ID: {}",id);
                                 }
                             } else if (message.contains("method")) {
                                 // This is a request or notification
-                                LOG_INFO("Received request/notification: ", message["method"]);
+                                SPDLOG_INFO("Received request/notification: {}",message["method"]);
                                 // Currently not handling requests from the server
                             }
                         }
                     } catch (const json::exception& e) {
-                        LOG_INFO("message: ", line);
+                        SPDLOG_INFO("message: {}",line);
                     }
                 }
             }
         } else if (bytes_read == 0) {
             // Pipe is closed
-            LOG_WARNING("Pipe closed by server");
+            SPDLOG_WARN("Pipe closed by server");
             break;
         } else if (bytes_read == -1) {
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
                 // No data to read in non-blocking mode
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
             } else {
-                LOG_ERROR("Error reading from pipe: ", strerror(errno));
+                SPDLOG_ERROR("Error reading from pipe: {}",strerror(errno));
                 break;
             }
         }
     }
 #endif
     
-    LOG_INFO("Read thread stopped");
+    SPDLOG_INFO("Read thread stopped");
 }
 
 json stdio_client::send_jsonrpc(const request& req) {
@@ -792,7 +794,7 @@ json stdio_client::send_jsonrpc(const request& req) {
     BOOL success = WriteFile(stdin_pipe_[1], req_str.c_str(), static_cast<DWORD>(req_str.size()), &bytes_written, NULL);
     
     if (!success || bytes_written != static_cast<DWORD>(req_str.size())) {
-        LOG_ERROR("Failed to write complete request: ", GetLastError());
+        SPDLOG_ERROR("Failed to write complete request: {}",GetLastError());
         throw mcp_exception(error_code::internal_error, "Failed to write to pipe");
     }
 #else
@@ -800,7 +802,7 @@ json stdio_client::send_jsonrpc(const request& req) {
     ssize_t bytes_written = write(stdin_pipe_[1], req_str.c_str(), req_str.size());
     
     if (bytes_written != static_cast<ssize_t>(req_str.size())) {
-        LOG_ERROR("Failed to write complete request: ", strerror(errno));
+        SPDLOG_ERROR("Failed to write complete request: {}",strerror(errno));
         throw mcp_exception(error_code::internal_error, "Failed to write to pipe");
     }
 #endif

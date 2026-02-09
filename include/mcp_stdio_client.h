@@ -13,7 +13,6 @@
 #include "mcp_client.h"
 #include "mcp_message.h"
 #include "mcp_tool.h"
-#include "mcp_logger.h"
 
 #include <string>
 #include <map>
