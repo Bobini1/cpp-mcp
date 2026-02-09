@@ -54,9 +54,13 @@ public:
     }
     
     /**
-     * @brief Destructor - jthread automatically requests stop and joins
+     * @brief Destructor - request stop on all threads and wake them up
      */
     ~thread_pool() {
+        auto lock = std::unique_lock(queue_mutex_);
+        for (auto& worker : workers_) {
+            worker.request_stop();
+        }
         condition_.notify_all();
     }
     
