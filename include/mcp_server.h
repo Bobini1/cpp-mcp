@@ -429,6 +429,8 @@ private:
     void check_inactive_sessions();
 
     std::jthread maintenance_thread_;
+    std::mutex maintenance_mutex_;
+    std::condition_variable maintenance_cv_;
 
     // Session cleanup handler
     std::map<std::string, session_cleanup_handler> session_cleanup_handler_;

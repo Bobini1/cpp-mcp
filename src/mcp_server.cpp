@@ -79,13 +79,25 @@ bool server::start(bool blocking) {
     if (!blocking && !maintenance_thread_.joinable()) {
         maintenance_thread_ = std::jthread([this](std::stop_token st) {
             SPDLOG_INFO("Maintenance thread starting");
+            std::unique_lock<std::mutex> lock(maintenance_mutex_);
+            std::stop_callback stop_cb(st, [this]() {
+                maintenance_cv_.notify_all();
+            });
+
             while (!st.stop_requested()) {
-                for (int i = 0; i < 60 && !st.stop_requested(); ++i) {
-                    std::this_thread::sleep_for(std::chrono::seconds(1));
-                }
-                if (st.stop_requested() || !running_) {
+                const auto awakened = maintenance_cv_.wait_for(
+                    lock,
+                    std::chrono::minutes(1),
+                    [this, &st]() {
+                        return st.stop_requested() || !running_;
+                    }
+                );
+
+                if (awakened) {
                     break;
                 }
+
+                lock.unlock();
                 try {
                     check_inactive_sessions();
                 } catch (const std::exception& e) {
@@ -93,6 +105,7 @@ bool server::start(bool blocking) {
                 } catch (...) {
                     SPDLOG_ERROR("Unknown exception in maintenance thread");
                 }
+                lock.lock();
             }
             SPDLOG_INFO("Maintenance thread exiting");
         });
@@ -130,6 +143,7 @@ void server::stop() {
     SPDLOG_INFO("Stopping MCP server on ", host_, ":", port_);
     running_ = false;
     http_server_->stop();
+    maintenance_cv_.notify_all();
 
     if (maintenance_thread_.joinable()) {
         maintenance_thread_.request_stop();
@@ -370,13 +384,28 @@ void server::handle_sse(const httplib::Request& req, httplib::Response& res) {
     // Create session thread
     auto thread = std::jthread([this, session_id, session_uri, session_dispatcher](std::stop_token st) {
         try {
-            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+            std::mutex wait_mutex;
+            std::condition_variable wait_cv;
+            auto interrupted = [this, &st, session_dispatcher]() {
+                return st.stop_requested() || !running_ || session_dispatcher->is_closed();
+            };
+            std::stop_callback stop_cb(st, [&wait_cv]() {
+                wait_cv.notify_all();
+            });
+            auto wait_with_interrupt = [&](const auto& duration) {
+                std::unique_lock<std::mutex> lk(wait_mutex);
+                return wait_cv.wait_for(lk, duration, interrupted);
+            };
+
+            if (wait_with_interrupt(std::chrono::milliseconds(500))) {
+                return;
+            }
+
             session_dispatcher->send_event("event: endpoint\r\ndata: " + session_uri + "\r\n\r\n");
             session_dispatcher->update_activity();
             int heartbeat_count = 0;
             while (running_ && !st.stop_requested() && !session_dispatcher->is_closed()) {
-                std::this_thread::sleep_for(std::chrono::seconds(5));
-                if (st.stop_requested() || session_dispatcher->is_closed() || !running_) {
+                if (wait_with_interrupt(std::chrono::seconds(5))) {
                     break;
                 }
                 std::stringstream heartbeat;
