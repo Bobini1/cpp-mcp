@@ -62,10 +62,9 @@ public:
                 return false;
             }
             
-            int id = id_.load(std::memory_order_relaxed);
-            
-            bool result = cv_.wait_for(lk, timeout, [&] { 
-                return cid_.load(std::memory_order_relaxed) == id || closed_.load(std::memory_order_acquire); 
+            // Wait until there's a message available or we're closed
+            bool result = cv_.wait_for(lk, timeout, [this] {
+                return !message_.empty() || closed_.load(std::memory_order_acquire);
             });
             
             if (closed_.load(std::memory_order_acquire)) {
@@ -73,17 +72,17 @@ public:
             }
             
             if (!result) {
-                return false;
+                // Timeout with no message - that's ok, caller can retry
+                return true;
             }
             
-            // Only copy the message if there is one
+            // Take the message
             if (!message_.empty()) {
                 message_copy.swap(message_);
-            } else {
-                return true; // No message but condition satisfied
             }
         }
         
+        // Write outside the lock
         try {
             if (!message_copy.empty()) {
                 if (!sink->write(message_copy.data(), message_copy.size())) {
@@ -110,14 +109,10 @@ public:
                 return false;
             }
             
-            // Efficiently set the message and allocate space as needed
-            if (message.size() > message_.capacity()) {
-                message_.reserve(message.size() + 64); // Pre-allocate extra space to avoid frequent reallocations
-            }
-            message_ = message;
-            
-            cid_.store(id_.fetch_add(1, std::memory_order_relaxed), std::memory_order_relaxed);
-            cv_.notify_one(); // Notify waiting threads
+            // Append to message buffer (in case multiple sends before a wait)
+            message_ += message;
+
+            cv_.notify_one();
             return true;
         } catch (...) {
             return false;
@@ -125,16 +120,11 @@ public:
     }
     
     void close() {
-        bool was_closed = closed_.exchange(true, std::memory_order_release);
-        if (was_closed) {
-            return;
+        {
+            std::lock_guard<std::mutex> lk(m_);
+            closed_.store(true, std::memory_order_release);
         }
-        
-        try {
-            cv_.notify_all();
-        } catch (...) {
-            // Ignore exceptions
-        }
+        cv_.notify_all();
     }
     
     bool is_closed() const {
@@ -156,8 +146,6 @@ public:
 private:
     mutable std::mutex m_;
     std::condition_variable cv_;
-    std::atomic<int> id_{0};
-    std::atomic<int> cid_{-1};
     std::string message_;
     std::atomic<bool> closed_{false};
     std::chrono::steady_clock::time_point last_activity_{std::chrono::steady_clock::now()};
